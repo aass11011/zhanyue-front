@@ -48,6 +48,5 @@
     "vite-plugin-router-warn": "^2.0.0",
     "vite-plugin-vue-devtools": "^8.0.6",
     "vue3-intro-step": "^1.0.5"
-  },
-
+  }
 }

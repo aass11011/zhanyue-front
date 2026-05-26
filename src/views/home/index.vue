@@ -13,7 +13,7 @@
       <n-card title="📊 概览" class="w-full">
         <div class="grid grid-cols-4 gap-8">
           <div class="p-8 bg-primary/5 rounded-lg">
-            <div class="text-32 font-bold text-primary">2,847</div>
+            <div class="text-32 font-bold text-primary">{{stockList[0]?.name}}</div>
             <div class="text-14 opacity-60 mt-4">Lorem ipsum dolor sit amet</div>
           </div>
           <div class="p-8 bg-success/5 rounded-lg">
@@ -103,6 +103,11 @@ import * as echarts from 'echarts/core'
 import { UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
+import { getStockListApi } from "@/api/stock/basic/index.js";
+import {onMounted} from "vue";
+
+
+const stockList = ref([])
 
 echarts.use([
   TooltipComponent,
@@ -169,4 +174,8 @@ const tableData = [
   { id: '7', name: 'Ut labore', status: 'Active', date: '2024-01-07' },
   { id: '8', name: 'Et dolore', status: 'Pending', date: '2024-01-08' },
 ]
+onMounted(async ()=>{
+  const res = await getStockListApi()
+  stockList.value = res.data || []
+})
 </script>
