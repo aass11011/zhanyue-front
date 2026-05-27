@@ -13,7 +13,7 @@
       <n-card title="📊 概览" class="w-full">
         <div class="grid grid-cols-4 gap-8">
           <div class="p-8 bg-primary/5 rounded-lg">
-            <div class="text-32 font-bold text-primary">{{stockList[0]?.name}}</div>
+            <div class="text-32 font-bold text-primary">{{stockList[0]?.stockFullName}}</div>
             <div class="text-14 opacity-60 mt-4">Lorem ipsum dolor sit amet</div>
           </div>
           <div class="p-8 bg-success/5 rounded-lg">
@@ -34,16 +34,21 @@
 
     <!-- 栏目二：内容区域 -->
     <div class="grid grid-cols-3 gap-12 mb-12">
-      <n-card title="📝 栏目A" class="col-span-2" segmented>
+      <n-card class="col-span-2" segmented>
+        <template #header>
+          <div class="flex items-center justify-between w-full">
+            <span class="font-semibold">📝 订单分析</span>
+            <n-select
+              v-model="selectedStock"
+              :options="stockOptions"
+              placeholder="选择股票"
+              :style="{ width: '160px' }"
+            />
+          </div>
+        </template>
         <div class="space-y-6">
           <p class="text-14 opacity-70">
             Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-          </p>
-          <p class="text-14 opacity-70">
-            Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-          </p>
-          <p class="text-14 opacity-70">
-            Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
           </p>
         </div>
       </n-card>
@@ -104,10 +109,11 @@ import { UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { getStockListApi } from "@/api/stock/basic/index.js";
-import {onMounted} from "vue";
+import {onMounted, computed} from "vue";
 
 
 const stockList = ref([])
+const selectedStock = ref('')
 
 echarts.use([
   TooltipComponent,
@@ -174,8 +180,15 @@ const tableData = [
   { id: '7', name: 'Ut labore', status: 'Active', date: '2024-01-07' },
   { id: '8', name: 'Et dolore', status: 'Pending', date: '2024-01-08' },
 ]
+const stockOptions = computed(() => {
+  return stockList.value.map(item => ({
+    label: item.stockFullName,
+    value: item.stockFullName
+  }))
+})
+
 onMounted(async ()=>{
   const res = await getStockListApi()
-  stockList.value = res.data || []
+  stockList.value = res.data.content || []
 })
 </script>
