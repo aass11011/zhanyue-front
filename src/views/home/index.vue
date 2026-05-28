@@ -38,12 +38,22 @@
         <template #header>
           <div class="flex items-center justify-between w-full">
             <span class="font-semibold">📝 订单分析</span>
-            <n-select
-              v-model="selectedStock"
-              :options="stockOptions"
-              placeholder="选择股票"
-              :style="{ width: '160px' }"
-            />
+            <div class="flex items-center gap-4">
+              <n-select
+                v-model="selectedStock"
+                :options="stockOptions"
+                placeholder="选择股票"
+                :style="{ width: '160px' }"
+                @update:value="fetchDateOptions"
+              />
+              <n-select
+                v-if="selectedStock"
+                v-model="selectedDate"
+                :options="dateOptions"
+                placeholder="选择日期"
+                :style="{ width: '160px' }"
+              />
+            </div>
           </div>
         </template>
         <div class="space-y-6">
@@ -109,11 +119,14 @@ import { UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { getStockListApi } from "@/api/stock/basic/index.js";
-import {onMounted, computed} from "vue";
+import { getOrderAnalysisApi } from "@/api/stock/analysis/index.js";
+import { onMounted, computed } from "vue";
 
 
 const stockList = ref([])
 const selectedStock = ref('')
+const selectedDate = ref('')
+const dateOptions = ref([])
 
 echarts.use([
   TooltipComponent,
@@ -183,9 +196,24 @@ const tableData = [
 const stockOptions = computed(() => {
   return stockList.value.map(item => ({
     label: item.stockFullName,
-    value: item.stockFullName
+    value: item.stockCode
   }))
 })
+
+const fetchDateOptions = async (value) => {
+  selectedStock.value = value
+  if (!selectedStock.value) {
+    dateOptions.value = []
+    selectedDate.value = ''
+    return
+  }
+  const res = await getOrderAnalysisApi({ stockCode: selectedStock.value })
+  // 假设接口返回的日期数据在 res.data.content 中，格式为 [{ date: '2024-01-01' }, ...]
+  dateOptions.value = (res.data.content || []).map(item => ({
+    label: item.date,
+    value: item.date
+  }))
+}
 
 onMounted(async ()=>{
   const res = await getStockListApi()
