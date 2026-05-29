@@ -52,13 +52,14 @@
                 :options="dateOptions"
                 placeholder="选择日期"
                 :style="{ width: '160px' }"
+                @update:value="fetchOrderAnalysisDetail"
               />
             </div>
           </div>
         </template>
         <div class="space-y-6">
           <p class="text-14 opacity-70">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+            {{ orderAnalysisDetail || '请选择股票和日期查看订单分析详情' }}
           </p>
         </div>
       </n-card>
@@ -87,7 +88,7 @@
 
     <!-- 栏目三：数据表格 -->
     <div class="grid grid-cols-2 gap-12 mb-12">
-      <n-card title="📈 栏目C" segmented>
+      <n-card title="📈 基金趋势" segmented>
         <div class="h-320">
           <VChart :option="chartOption1" autoresize />
         </div>
@@ -119,14 +120,17 @@ import { UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { getStockListApi } from "@/api/stock/basic/index.js";
-import { getOrderAnalysisApi } from "@/api/stock/analysis/index.js";
-import { onMounted, computed } from "vue";
+import { getOrderAnalysisApi, getOrderAnalysisDetailApi } from "@/api/stock/analysis/index.js";
+import { getStockSseFundsApi } from "@/api/stock/sse/index.js";
+import { ref, onMounted, computed } from "vue";
 
 
 const stockList = ref([])
 const selectedStock = ref('')
 const selectedDate = ref('')
 const dateOptions = ref([])
+const fundData = ref([])
+const orderAnalysisDetail = ref('')
 
 echarts.use([
   TooltipComponent,
@@ -138,24 +142,150 @@ echarts.use([
   UniversalTransition,
 ])
 
-const chartOption1 = {
-  tooltip: {
-    trigger: 'axis',
-  },
-  xAxis: {
-    type: 'category',
-    data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-  },
-  yAxis: {
-    type: 'value',
-  },
-  series: [
-    {
-      data: [120, 200, 150, 80, 220, 180, 250],
-      type: 'bar',
+const chartOption1 = computed(() => {
+  // 按日期分组
+  const dateMap = new Map()
+  fundData.value.forEach(item => {
+    const date = item.statDate
+    if (!dateMap.has(date)) {
+      dateMap.set(date, [])
+    }
+    dateMap.get(date).push(item)
+  })
+
+  // 获取所有唯一日期并排序
+  const dates = Array.from(dateMap.keys()).sort()
+
+  // 获取所有唯一基金，存储完整信息
+  const fundMap = new Map()
+  fundData.value.forEach(item => {
+    const key = item.secCode
+    if (!fundMap.has(key)) {
+      fundMap.set(key, {
+        name: item.secName,
+        data: [],
+        rawData: [],
+        baseValue: null
+      })
+    }
+  })
+
+  // 为每个基金填充数据并记录初始值
+  dates.forEach((date, index) => {
+    const dayData = dateMap.get(date)
+    const dayDataMap = new Map(dayData.map(item => [item.secCode, item.totVol]))
+
+    fundMap.forEach((fund, key) => {
+      const value = dayDataMap.get(key)
+      const numValue = value !== undefined ? Number(value) : null
+
+      if (index === 0 && numValue !== null) {
+        fund.baseValue = numValue
+      }
+
+      fund.rawData.push(numValue)
+      fund.data.push(numValue)
+    })
+  })
+
+  // 归一化数据（使曲线自适应显示趋势）
+  const normalizeData = (data) => {
+    const validData = data.filter(v => v !== null && v !== undefined)
+    if (validData.length === 0) return data
+    const min = Math.min(...validData)
+    const max = Math.max(...validData)
+    const range = max - min || 1
+    return data.map(v => v !== null && v !== undefined ? (v - min) / range : null)
+  }
+
+  // 计算相对于初始值的百分比变化
+  const calculatePercentChange = (data, baseValue) => {
+    if (baseValue === null || baseValue === undefined) return data.map(() => null)
+    return data.map(v => {
+      if (v === null || v === undefined) return null
+      return ((v - baseValue) / baseValue * 100)
+    })
+  }
+
+  // 构建series，使用归一化数据显示，同时存储原始数据用于tooltip
+  const seriesData = []
+  const fundInfoMap = new Map()
+
+  Array.from(fundMap.entries()).forEach(([code, fund]) => {
+    const normalizedData = normalizeData(fund.data)
+    const percentData = calculatePercentChange(fund.rawData, fund.baseValue)
+
+    fundInfoMap.set(fund.name, {
+      rawData: fund.rawData,
+      percentData: percentData,
+    })
+
+    seriesData.push({
+      name: fund.name,
+      type: 'line',
+      data: normalizedData,
+      smooth: true,
+      lineStyle: {
+        width: 2,
+      },
+      symbol: 'circle',
+      symbolSize: 4,
+    })
+  })
+
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const dateIndex = params[0].dataIndex
+        let result = `<div style="font-weight: bold; margin-bottom: 8px;">${params[0].axisValue}</div>`
+        params.forEach(param => {
+          const fundInfo = fundInfoMap.get(param.seriesName)
+          if (param.value !== null && fundInfo) {
+            const rawValue = fundInfo.rawData[dateIndex]
+            const percentValue = fundInfo.percentData[dateIndex]
+            const sign = percentValue >= 0 ? '+' : ''
+            result += `<div style="display: flex; align-items: center; margin: 4px 0;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${param.color}; margin-right: 8px;"></span>
+              <span>${param.seriesName}: </span>
+              <span style="margin-left: 4px;">${rawValue?.toLocaleString() || '-'}</span>
+              <span style="margin-left: 8px; color: ${percentValue >= 0 ? '#10b981' : '#ef4444'}">(${sign}${percentValue?.toFixed(2) || '-'}%)</span>
+            </div>`
+          }
+        })
+        return result
+      }
     },
-  ],
-}
+    legend: {
+      data: Array.from(fundMap.values()).map(f => f.name),
+      bottom: 0,
+      type: 'scroll',
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      top: '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: {
+        rotate: 45,
+      },
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 1.2,
+      axisLabel: {
+        formatter: '{value}',
+      },
+    },
+    series: seriesData,
+  }
+})
 
 const chartOption2 = {
   tooltip: {
@@ -205,6 +335,7 @@ const fetchDateOptions = async (value) => {
   if (!selectedStock.value) {
     dateOptions.value = []
     selectedDate.value = ''
+    orderAnalysisDetail.value = ''
     return
   }
   const res = await getOrderAnalysisApi({ stockCode: selectedStock.value })
@@ -215,8 +346,25 @@ const fetchDateOptions = async (value) => {
   }))
 }
 
+const fetchOrderAnalysisDetail = async (value) => {
+  selectedDate.value = value
+  if (!selectedDate.value || !selectedStock.value) {
+    orderAnalysisDetail.value = ''
+    return
+  }
+  const res = await getOrderAnalysisDetailApi({
+    stockCode: selectedStock.value,
+    date: selectedDate.value
+  })
+  orderAnalysisDetail.value = res.data || '暂无分析数据'
+}
+
 onMounted(async ()=>{
-  const res = await getStockListApi()
-  stockList.value = res.data.content || []
+  const [stockRes, fundRes] = await Promise.all([
+    getStockListApi(),
+    getStockSseFundsApi()
+  ])
+  stockList.value = stockRes.data.content || []
+  fundData.value = fundRes.data || []
 })
 </script>
