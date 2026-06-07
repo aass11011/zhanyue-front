@@ -2,3 +2,6 @@
 node_modules
 dist
 stats.html
+public/video/*.*
+public/img/*.*
+public/img/personal/*.*

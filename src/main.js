@@ -15,6 +15,8 @@ import { setupDirectives } from './directives'
 import { setupRouter } from './router'
 import { setupStore } from './store'
 import { setupNaiveDiscreteApi } from './utils'
+import VxeUITable from 'vxe-table'
+import 'vxe-table/lib/style.css'
 import '@/styles/reset.css'
 import '@/styles/global.css'
 import 'uno.css'
@@ -23,6 +25,7 @@ async function bootstrap() {
   const app = createApp(App)
   setupStore(app)
   setupDirectives(app)
+  app.use(VxeUITable)
   await setupRouter(app)
   app.mount('#app')
   setupNaiveDiscreteApi()

@@ -14,7 +14,37 @@ export const basicRoutes = [
     path: '/',
     component: () => import('@/views/home/index.vue'),
     meta: {
-      title: '首页',
+      title: '股票',
+      layout: 'topbar',
+    },
+  },
+
+  {
+    name: 'PersonalSpace',
+    path: '/personal-space',
+    component: () => import('@/views/personal-space/index.vue'),
+    meta: {
+      title: '个人空间',
+      layout: 'topbar',
+    },
+  },
+
+  {
+    name: 'History',
+    path: '/history',
+    component: () => import('@/views/history/index.vue'),
+    meta: {
+      title: '历史',
+      layout: 'topbar',
+    },
+  },
+
+  {
+    name: 'StudyNotes',
+    path: '/study-notes',
+    component: () => import('@/views/study-notes/index.vue'),
+    meta: {
+      title: '学习笔记',
       layout: 'topbar',
     },
   },
