@@ -734,10 +734,17 @@ onMounted(async ()=>{
 /* 大盘分析 */
 .market-layout {
   display: flex;
-  gap: 24px;
+  flex-direction: column;
+  gap: 16px;
 }
-.market-calendar {
-  flex: 0 0 380px;
+@media (min-width: 768px) {
+  .market-layout {
+    flex-direction: row;
+    gap: 24px;
+  }
+  .market-calendar {
+    flex: 0 0 380px;
+  }
 }
 .calendar-nav {
   display: flex;
@@ -794,11 +801,21 @@ onMounted(async ()=>{
 }
 .market-analysis {
   flex: 1;
-  min-height: 400px;
-  max-height: 460px;
+  min-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
-  border-left: 1px solid #ebeef5;
-  padding-left: 24px;
+  border-top: 1px solid #ebeef5;
+  padding-top: 16px;
+}
+@media (min-width: 768px) {
+  .market-analysis {
+    min-height: 400px;
+    max-height: 460px;
+    border-left: 1px solid #ebeef5;
+    border-top: none;
+    padding-left: 24px;
+    padding-top: 0;
+  }
 }
 .analysis-list {
   display: flex;
@@ -818,23 +835,44 @@ onMounted(async ()=>{
 }
 .analysis-item-header h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
+}
+@media (min-width: 768px) {
+  .analysis-item-header h4 {
+    font-size: 15px;
+  }
 }
 .analysis-fields {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .analysis-field {
   display: flex;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+@media (min-width: 768px) {
+  .analysis-fields {
+    gap: 6px;
+  }
+  .analysis-field {
+    gap: 8px;
+    font-size: 13px;
+    flex-wrap: nowrap;
+  }
 }
 .field-label {
   color: #666;
-  min-width: 80px;
+  min-width: 60px;
   flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .field-label {
+    min-width: 80px;
+  }
 }
 .field-value {
   font-weight: 500;
@@ -842,25 +880,38 @@ onMounted(async ()=>{
 }
 
 .behaviour-cell {
-  line-height: 1.6;
+  line-height: 1.5;
 }
 .behaviour-date {
-  font-size: 12px;
+  font-size: 11px;
   color: #409eff;
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .behaviour-analysis {
-  font-size: 13px;
+  font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .behaviour-plan {
-  font-size: 12px;
+  font-size: 10px;
   color: #909399;
-  margin-top: 4px;
+  margin-top: 3px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+@media (min-width: 768px) {
+  .behaviour-date {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .behaviour-analysis {
+    font-size: 13px;
+  }
+  .behaviour-plan {
+    font-size: 12px;
+    margin-top: 4px;
+  }
 }
 .behaviour-images {
   display: flex;
@@ -972,20 +1023,35 @@ onMounted(async ()=>{
 }
 
 .opinion-timeline {
-  max-height: 500px;
+  height: 200px;
   overflow-y: auto;
 }
 .opinion-item-header {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .opinion-stock {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 .opinion-content {
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 12px;
+  line-height: 1.6;
   word-break: break-word;
+}
+@media (min-width: 768px) {
+  .opinion-timeline {
+    height: 300px;
+  }
+  .opinion-item-header {
+    margin-bottom: 6px;
+  }
+  .opinion-stock {
+    font-size: 14px;
+  }
+  .opinion-content {
+    font-size: 13px;
+    line-height: 1.7;
+  }
 }
 .opinion-content :deep(img) {
   max-width: 100%;
@@ -997,6 +1063,7 @@ onMounted(async ()=>{
   margin: 8px 0;
   border-radius: 4px;
   transition: transform 0.2s;
+  margin: 3px auto;
 }
 .opinion-content :deep(img):hover {
   transform: scale(1.02);
