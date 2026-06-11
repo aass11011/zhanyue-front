@@ -52,6 +52,14 @@
               :label="v"
             />
           </n-radio-group>
+          <n-select
+            v-model:value="opinionType"
+            :options="opinionTypeList.map(t => ({ label: t.dictName, value: t.id }))"
+            placeholder="观点类型"
+            clearable
+            :style="{ width: '140px' }"
+            size="small"
+          />
         </div>
         <div v-if="opinionFilteredList.length > 0" class="opinion-timeline">
           <n-timeline>
@@ -269,7 +277,7 @@ import { getStockListApi } from "@/api/stock/basic/index.js";
 import { getOrderAnalysisApi, getOrderAnalysisDetailApi } from "@/api/stock/analysis/index.js";
 import { getStockSseFundsApi } from "@/api/stock/sse/index.js";
 import { getBehaviourListAllApi } from "@/api/stock/behaviour/index.js";
-import { getStockOptionListApi } from "@/api/stock/option/index.js";
+import { getStockOptionListApi, getDictDataListByTypeApi } from "@/api/stock/option/index.js";
 import { getStockMarketRecordApi } from "@/api/stock/market/index.js";
 import { getStockCaseListApi } from "@/api/stock/case/index.js";
 import { ref, onMounted, computed, watch, nextTick } from "vue";
@@ -289,6 +297,8 @@ const previewImageUrl = ref('')
 const opinionList = ref([])
 const opinionViewer = ref('')
 const opinionViewerList = ref([])
+const opinionType = ref('')
+const opinionTypeList = ref([])
 
 // 大盘分析日历
 const marketRecords = ref([])
@@ -633,8 +643,12 @@ const fetchBehaviourData = async () => {
 
 const fetchOpinionData = async () => {
   try {
-    const res = await getStockOptionListApi({ sort: 'createdTime desc' })
-    opinionList.value = res?.data || []
+    const [opinionRes, dictRes] = await Promise.all([
+      getStockOptionListApi({ sort: 'createdTime desc' }),
+      getDictDataListByTypeApi({ typeId: '27210aac-3474-42e8-8a94-198f282f7290' })
+    ])
+    opinionList.value = opinionRes?.data || []
+    opinionTypeList.value = dictRes?.data || []
 
     // 从数据中提取唯一 viewer 列表
     const viewers = new Set()
@@ -653,8 +667,14 @@ const fetchOpinionData = async () => {
 }
 
 const opinionFilteredList = computed(() => {
-  if (!opinionViewer.value) return opinionList.value
-  return opinionList.value.filter((item) => item.viewer === opinionViewer.value)
+  let list = opinionList.value
+  if (opinionViewer.value) {
+    list = list.filter((item) => item.viewer === opinionViewer.value)
+  }
+  if (opinionType.value) {
+    list = list.filter((item) => item.type === opinionType.value)
+  }
+  return list
 })
 
 const bindOpinionImageClicks = () => {
@@ -670,6 +690,7 @@ const bindOpinionImageClicks = () => {
 }
 
 watch(opinionViewer, async () => {
+  opinionType.value = ''
   await nextTick()
   bindOpinionImageClicks()
 })
