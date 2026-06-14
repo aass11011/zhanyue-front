@@ -55,10 +55,10 @@ export default defineConfig(({ mode }) => {
       port: 3200,
       open: false,
       proxy: {
-        '/api': {
+        '/portal-api': {
           target: VITE_PROXY_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, ''),
+          rewrite: path => path.replace(/^\/portal-api/, ''),
           secure: false,
           configure: (proxy, options) => {
             // 配置此项可在响应头中看到请求的真实地址
