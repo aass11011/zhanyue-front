@@ -52,6 +52,14 @@
               :label="v"
             />
           </n-radio-group>
+          <n-select
+            v-model:value="opinionType"
+            :options="opinionTypeList.map(t => ({ label: t.dictName, value: t.id }))"
+            placeholder="观点类型"
+            clearable
+            :style="{ width: '140px' }"
+            size="small"
+          />
         </div>
         <div v-if="opinionFilteredList.length > 0" class="opinion-timeline">
           <n-timeline>
@@ -123,17 +131,32 @@
           </div>
           <!-- 右侧：分析内容 -->
           <div class="market-analysis">
-            <template v-if="!selectedMarketDate">
-              <div class="text-14 opacity-50 text-center pt-40">请点击日历日期查看大盘分析</div>
+            <div class="market-filter-bar">
+              <n-select
+                v-model:value="selectedSchemaId"
+                :options="marketSchemaList.map(s => ({ label: s.name, value: s.id }))"
+                placeholder="全部模板"
+                clearable
+                :style="{ width: '180px' }"
+                size="small"
+              />
+            </div>
+            <template v-if="!selectedMarketDate && !selectedSchemaId">
+              <div class="text-14 opacity-50 text-center pt-40">请点击日历日期或选择模板查看大盘分析</div>
             </template>
             <template v-else-if="!selectedMarketRecords.length">
-              <div class="text-14 opacity-50 text-center pt-40">{{ selectedMarketDate }} 暂无大盘分析数据</div>
+              <div class="text-14 opacity-50 text-center pt-40">暂无大盘分析数据</div>
             </template>
             <template v-else>
               <div class="analysis-list">
                 <div v-for="item in selectedMarketRecords" :key="item.id" class="analysis-item">
                   <div class="analysis-item-header">
-                    <h4>{{ item.title || '大盘分析' }}</h4>
+                    <h4>
+                      {{ item.title || '大盘分析' }}
+                      <span v-if="schemaNameMap[item.schemaId]" class="schema-tag">
+                        [{{ schemaNameMap[item.schemaId] }}]
+                      </span>
+                    </h4>
                     <span class="text-12 opacity-50">{{ item.createdTime }}</span>
                   </div>
                   <div class="analysis-fields">
@@ -269,8 +292,8 @@ import { getStockListApi } from "@/api/stock/basic/index.js";
 import { getOrderAnalysisApi, getOrderAnalysisDetailApi } from "@/api/stock/analysis/index.js";
 import { getStockSseFundsApi } from "@/api/stock/sse/index.js";
 import { getBehaviourListAllApi } from "@/api/stock/behaviour/index.js";
-import { getStockOptionListApi } from "@/api/stock/option/index.js";
-import { getStockMarketRecordApi } from "@/api/stock/market/index.js";
+import { getStockOptionListApi, getDictDataListByTypeApi } from "@/api/stock/option/index.js";
+import { getStockMarketRecordApi, getStockMarketSchemaListAllApi } from "@/api/stock/market/index.js";
 import { getStockCaseListApi } from "@/api/stock/case/index.js";
 import { ref, onMounted, computed, watch, nextTick } from "vue";
 
@@ -289,12 +312,24 @@ const previewImageUrl = ref('')
 const opinionList = ref([])
 const opinionViewer = ref('')
 const opinionViewerList = ref([])
+const opinionType = ref('')
+const opinionTypeList = ref([])
 
 // 大盘分析日历
 const marketRecords = ref([])
+const marketSchemaList = ref([])
+const selectedSchemaId = ref(null)
 const selectedMarketDate = ref('')
 const calendarYear = ref(new Date().getFullYear())
 const calendarMonth = ref(new Date().getMonth() + 1)
+
+const schemaNameMap = computed(() => {
+  const map = {}
+  marketSchemaList.value.forEach((s) => {
+    map[s.id] = s.name
+  })
+  return map
+})
 
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -325,11 +360,20 @@ const marketDateSet = computed(() => {
 })
 
 const selectedMarketRecords = computed(() => {
-  if (!selectedMarketDate.value) return []
-  return marketRecords.value.filter((r) => {
-    const dateStr = (r.createdTime || '').split(' ')[0]
-    return dateStr === selectedMarketDate.value
-  })
+  let list = marketRecords.value
+
+  if (selectedSchemaId.value) {
+    list = list.filter((r) => r.schemaId === selectedSchemaId.value)
+  }
+
+  if (selectedMarketDate.value) {
+    list = list.filter((r) => {
+      const dateStr = (r.createdTime || '').split(' ')[0]
+      return dateStr === selectedMarketDate.value
+    })
+  }
+
+  return list
 })
 
 const calendarDays = ref([])
@@ -381,8 +425,12 @@ const selectMarketDate = (dateStr) => {
 
 const fetchMarketData = async () => {
   try {
-    const res = await getStockMarketRecordApi({ sort: 'createdTime desc' })
-    marketRecords.value = res?.data || []
+    const [recordRes, schemaRes] = await Promise.all([
+      getStockMarketRecordApi({ sort: 'createdTime desc' }),
+      getStockMarketSchemaListAllApi()
+    ])
+    marketRecords.value = recordRes?.data || []
+    marketSchemaList.value = schemaRes?.data || []
   } catch (e) {
     // ignore
   }
@@ -633,8 +681,12 @@ const fetchBehaviourData = async () => {
 
 const fetchOpinionData = async () => {
   try {
-    const res = await getStockOptionListApi({ sort: 'createdTime desc' })
-    opinionList.value = res?.data || []
+    const [opinionRes, dictRes] = await Promise.all([
+      getStockOptionListApi({ sort: 'createdTime desc' }),
+      getDictDataListByTypeApi({ typeId: '27210aac-3474-42e8-8a94-198f282f7290' })
+    ])
+    opinionList.value = opinionRes?.data || []
+    opinionTypeList.value = dictRes?.data || []
 
     // 从数据中提取唯一 viewer 列表
     const viewers = new Set()
@@ -653,8 +705,14 @@ const fetchOpinionData = async () => {
 }
 
 const opinionFilteredList = computed(() => {
-  if (!opinionViewer.value) return opinionList.value
-  return opinionList.value.filter((item) => item.viewer === opinionViewer.value)
+  let list = opinionList.value
+  if (opinionViewer.value) {
+    list = list.filter((item) => item.viewer === opinionViewer.value)
+  }
+  if (opinionType.value) {
+    list = list.filter((item) => item.type === opinionType.value)
+  }
+  return list
 })
 
 const bindOpinionImageClicks = () => {
@@ -670,6 +728,7 @@ const bindOpinionImageClicks = () => {
 }
 
 watch(opinionViewer, async () => {
+  opinionType.value = ''
   await nextTick()
   bindOpinionImageClicks()
 })
@@ -799,6 +858,12 @@ onMounted(async ()=>{
 .calendar-day.is-other-month {
   color: #ccc;
 }
+.market-filter-bar {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .market-analysis {
   flex: 1;
   min-height: 200px;
@@ -816,6 +881,12 @@ onMounted(async ()=>{
     padding-left: 24px;
     padding-top: 0;
   }
+}
+.schema-tag {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 400;
+  margin-left: 4px;
 }
 .analysis-list {
   display: flex;
