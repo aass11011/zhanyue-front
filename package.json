@@ -14,6 +14,7 @@
     "@vueuse/core": "^14.2.1",
     "axios": "^1.13.5",
     "dayjs": "^1.11.19",
+    "dom-zindex": "^1.0.7",
     "echarts": "^6.0.0",
     "lodash-es": "^4.17.23",
     "naive-ui": "^2.43.2",
@@ -24,6 +25,7 @@
     "vue-router": "^5.0.3",
     "vxe-pc-ui": "^4.14.31",
     "vxe-table": "^4.19.8",
+    "xe-utils": "^4.1.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

@@ -14,8 +14,29 @@ export const basicRoutes = [
     path: '/',
     component: () => import('@/views/home/index.vue'),
     meta: {
+      title: '首页',
+      layout: 'topbar',
+    },
+  },
+
+  {
+    name: 'Stock',
+    path: '/stock',
+    component: () => import('@/views/stock/index.vue'),
+    meta: {
       title: '股票',
       layout: 'topbar',
+    },
+  },
+
+  {
+    name: 'ArticleDetail',
+    path: '/article/:id',
+    component: () => import('@/views/article/detail.vue'),
+    meta: {
+      title: '文章详情',
+      layout: 'topbar',
+      keepAlive: false,
     },
   },
 

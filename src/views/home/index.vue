@@ -1,1142 +1,466 @@
-<!--------------------------------
- - @Author: Ronnie Zhang
- - @LastEditor: Ronnie Zhang
- - @LastEditTime: 2023/12/05 21:28:22
- - @Email: zclzone@outlook.com
- - Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
- --------------------------------->
-
 <template>
-  <div class="p-12">
+  <div class="zh-home">
+    <div class="zh-container">
+      <!-- 主栏：文章流 -->
+      <div class="zh-main">
+        <div class="zh-tabbar">
+          <span class="zh-tab zh-tab--active">推荐</span>
+          <span class="zh-tab">文章</span>
+        </div>
 
+        <n-skeleton v-if="loading" v-for="i in 3" :key="i" text class="mb-16" />
 
-    <!-- 栏目二：内容区域 -->
-    <div class="grid grid-cols-5 gap-12 mb-12">
-      <n-card class="col-span-2" segmented>
-        <template #header>
-          <div class="flex items-center justify-between w-full">
-            <span class="font-semibold">📝 订单分析</span>
-            <div class="flex items-center gap-4">
-              <n-select
-                v-model="selectedStock"
-                :options="stockOptions"
-                placeholder="选择股票"
-                :style="{ width: '160px' }"
-                @update:value="fetchDateOptions"
-              />
-              <n-select
-                v-if="selectedStock"
-                v-model="selectedDate"
-                :options="dateOptions"
-                placeholder="选择日期"
-                :style="{ width: '160px' }"
-                @update:value="fetchOrderAnalysisDetail"
-              />
+        <n-empty
+          v-else-if="articleList.length === 0"
+          class="py-60"
+          description="暂无文章，请到后台管理系统发布"
+        />
+
+        <div v-else class="zh-feed">
+          <div v-for="item in articleList" :key="item.id" class="zh-feed-item">
+            <!-- 左侧投票区 -->
+            <div class="zh-vote">
+              <div class="zh-vote-btn zh-vote-btn--up" @click="like(item)">
+                <span class="zh-vote-arrow"></span>
+              </div>
+              <div class="zh-vote-count">{{ item.voteCount ?? 0 }}</div>
+              <div class="zh-vote-btn" @click="dislike(item)">
+                <span class="zh-vote-arrow zh-vote-arrow--down"></span>
+              </div>
             </div>
-          </div>
-        </template>
-        <div class="space-y-6">
-          <p class="text-14 opacity-70">
-            {{ orderAnalysisDetail || '请选择股票和日期查看订单分析详情' }}
-          </p>
-        </div>
-      </n-card>
 
-      <n-card title="💡 股票观点" segmented class="col-span-3">
-        <div class="flex items-center gap-2 mb-16 flex-wrap">
-          <n-radio-group v-model:value="opinionViewer" name="viewer" size="small">
-            <n-radio-button
-              v-for="v in opinionViewerList"
-              :key="v"
-              :value="v"
-              :label="v"
-            />
-          </n-radio-group>
-          <n-select
-            v-model:value="opinionType"
-            :options="opinionTypeList.map(t => ({ label: t.dictName, value: t.id }))"
-            placeholder="观点类型"
-            clearable
-            :style="{ width: '140px' }"
-            size="small"
-          />
-        </div>
-        <div v-if="opinionFilteredList.length > 0" class="opinion-timeline">
-          <n-timeline>
-            <n-timeline-item
-              v-for="item in opinionFilteredList"
-              :key="item.id"
-              :time="item.dates"
-              type="default"
-            >
-              <div class="opinion-item-header">
-                <span v-if="item.stockName" class="opinion-stock">
-                  {{ item.stockName }} ({{ item.stockCode }})
+            <!-- 正文区 -->
+            <div class="zh-body">
+              <div class="zh-author">
+                <span class="zh-avatar" :style="{ background: avatarColor(item.author) }">
+                  {{ authorInitial(item) }}
                 </span>
-                <span v-else class="opinion-stock">观点</span>
-              </div>
-              <div class="opinion-content" v-html="item.content"></div>
-            </n-timeline-item>
-          </n-timeline>
-        </div>
-        <div v-else class="text-14 opacity-50 text-center py-20">
-          暂无观点数据
-        </div>
-      </n-card>
-    </div>
-    <!-- 栏目一：大盘分析 -->
-    <div class="mb-12">
-      <n-card title="📊 大盘分析" class="w-full">
-        <div class="market-layout">
-          <!-- 左侧：日历 -->
-          <div class="market-calendar">
-            <div class="calendar-nav">
-              <n-button size="small" @click="calendarYear--; buildCalendar()">&laquo;</n-button>
-              <n-select
-                v-model:value="calendarYear"
-                :options="yearOptions"
-                :style="{ width: '80px' }"
-                size="small"
-                @update:value="buildCalendar"
-              />
-              <span class="text-14 font-semibold">年</span>
-              <n-select
-                v-model:value="calendarMonth"
-                :options="monthOptions"
-                :style="{ width: '64px' }"
-                size="small"
-                @update:value="buildCalendar"
-              />
-              <span class="text-14 font-semibold">月</span>
-              <n-button size="small" @click="calendarYear++; buildCalendar()">&raquo;</n-button>
-            </div>
-            <div class="calendar-weekdays">
-              <span v-for="d in weekDays" :key="d" class="weekday-cell">{{ d }}</span>
-            </div>
-            <div class="calendar-grid">
-              <div
-                v-for="(day, idx) in calendarDays"
-                :key="idx"
-                class="calendar-day"
-                :class="{
-                  'has-data': day && marketDateSet.has(day.dateStr),
-                  'is-selected': day && day.dateStr === selectedMarketDate,
-                  'is-other-month': day && day.isOtherMonth
-                }"
-                @click="day && selectMarketDate(day.dateStr)"
-              >
-                <span v-if="day">{{ day.day }}</span>
-              </div>
-            </div>
-          </div>
-          <!-- 右侧：分析内容 -->
-          <div class="market-analysis">
-            <div class="market-filter-bar">
-              <n-select
-                v-model:value="selectedSchemaId"
-                :options="marketSchemaList.map(s => ({ label: s.name, value: s.id }))"
-                placeholder="全部模板"
-                clearable
-                :style="{ width: '180px' }"
-                size="small"
-              />
-            </div>
-            <template v-if="!selectedMarketDate && !selectedSchemaId">
-              <div class="text-14 opacity-50 text-center pt-40">请点击日历日期或选择模板查看大盘分析</div>
-            </template>
-            <template v-else-if="!selectedMarketRecords.length">
-              <div class="text-14 opacity-50 text-center pt-40">暂无大盘分析数据</div>
-            </template>
-            <template v-else>
-              <div class="analysis-list">
-                <div v-for="item in selectedMarketRecords" :key="item.id" class="analysis-item">
-                  <div class="analysis-item-header">
-                    <h4>
-                      {{ item.title || '大盘分析' }}
-                      <span v-if="schemaNameMap[item.schemaId]" class="schema-tag">
-                        [{{ schemaNameMap[item.schemaId] }}]
-                      </span>
-                    </h4>
-                    <span class="text-12 opacity-50">{{ item.createdTime }}</span>
-                  </div>
-                  <div class="analysis-fields">
-                    <div v-for="field in item.list" :key="field.id" class="analysis-field">
-                      <span class="field-label">{{ field.fieldName }}</span>
-                      <span class="field-value">{{ field.fieldValue }}</span>
-                    </div>
-                  </div>
+                <div class="zh-author-info">
+                  <span class="zh-author-name">{{ item.author || '占月明' }}</span>
+                  <span class="zh-author-time">{{ formatTime(item.createdTime) }}</span>
                 </div>
               </div>
-            </template>
-          </div>
-        </div>
-      </n-card>
-    </div>
-    <!-- 栏目三：数据表格 -->
-    <div class="grid grid-cols-2 gap-12 mb-12">
-      <n-card title="📈 基金趋势" segmented>
-        <div class="h-320">
-          <VChart :option="chartOption1" autoresize />
-        </div>
-      </n-card>
 
-      <n-card segmented>
-        <template #header>
-          <div class="flex items-center justify-between w-full">
-            <span class="font-semibold">📖 股票案例</span>
-            <n-button v-if="caseDetail" size="tiny" @click="caseDetail = null">
-              ✕
-            </n-button>
-          </div>
-        </template>
-        <!-- 列表视图 -->
-        <div v-if="!caseDetail" class="case-list">
-          <div v-if="caseList.length === 0" class="text-14 opacity-50 text-center py-40">
-            暂无案例数据
-          </div>
-          <div
-            v-for="item in caseList"
-            :key="item.id"
-            class="case-item"
-            @click="caseDetail = item"
-          >
-            <div class="case-title">{{ item.title }}</div>
-            <div class="case-meta">
-              <span v-if="item.stockName">{{ item.stockName }}</span>
-              <span v-if="item.caseDate">{{ item.caseDate }}</span>
-              <span v-if="item.category">{{ item.category }}</span>
-            </div>
-          </div>
-        </div>
-        <!-- 详情视图 -->
-        <div v-else class="case-detail">
-          <h3 class="case-detail-title">{{ caseDetail.title }}</h3>
-          <div class="case-detail-meta">
-            <span v-if="caseDetail.stockName">{{ caseDetail.stockName }} ({{ caseDetail.stockCode }})</span>
-            <span v-if="caseDetail.caseDate">{{ caseDetail.caseDate }}</span>
-            <span v-if="caseDetail.category">{{ caseDetail.category }}</span>
-          </div>
-          <div class="case-detail-content" v-html="caseDetail.content"></div>
-        </div>
-      </n-card>
-    </div>
+              <div class="zh-title" @click="goDetail(item)">{{ item.title }}</div>
+              <div class="zh-excerpt" @click="goDetail(item)">{{ excerpt(item.content) }}</div>
 
-    <!-- 栏目四：行为分析 -->
-    <n-card title="📋 行为分析" segmented>
-      <vxe-table
-        :data="behaviourTableData"
-        :loading="behaviourLoading"
-        :column-config="{ resizable: true }"
-        border
-        stripe
-        round
-        max-height="600"
-        size="small"
-      >
-        <vxe-column field="stockName" title="股票名称" width="140" fixed="left">
-          <template #default="{ row }">
-            <span class="font-semibold">{{ row.stockName }}</span>
-          </template>
-        </vxe-column>
-        <vxe-column
-          v-for="idx in behaviourMaxRecordCount"
-          :key="idx"
-          :title="'记录' + idx"
-          min-width="300"
-        >
-          <template #default="{ row }">
-            <div v-if="row.records && row.records[idx - 1]" class="behaviour-cell">
-              <div class="behaviour-date">{{ row.records[idx - 1].createdTime }}</div>
-              <div class="behaviour-analysis">{{ row.records[idx - 1].analysis || '-' }}</div>
-              <div v-if="row.records[idx - 1].tradingPlan" class="behaviour-plan">
-                计划: {{ row.records[idx - 1].tradingPlan }}
-              </div>
-              <div
-                v-if="getImageList(row.records[idx - 1]).length"
-                class="behaviour-images"
-              >
-                <img
-                  v-for="(url, imgIdx) in getImageList(row.records[idx - 1])"
-                  :key="imgIdx"
-                  :src="url"
-                  class="behaviour-image"
-                  @click="previewImage(url)"
-                />
+              <div class="zh-actions">
+                <span class="zh-action" @click="like(item)">
+                  <span class="zh-action-icon">▲</span>赞同
+                </span>
+                <span class="zh-action" @click="goDetail(item)">
+                  <span class="zh-action-icon">💬</span>阅读全文
+                </span>
+                <span class="zh-action" @click="favorite(item)">
+                  <span class="zh-action-icon">★</span>收藏
+                </span>
+                <span class="zh-action" @click="share(item)">
+                  <span class="zh-action-icon">↗</span>分享
+                </span>
               </div>
             </div>
-            <span v-else class="opacity-40">-</span>
-          </template>
-        </vxe-column>
-      </vxe-table>
-      <div v-if="!behaviourLoading && behaviourTableData.length === 0" class="empty-state">
-        暂无行为分析数据
+          </div>
+        </div>
+
+        <div v-if="totalPages > 1" class="zh-pagination">
+          <n-pagination
+            v-model:page="currentPage"
+            :page-count="totalPages"
+            @update:page="fetchData"
+          />
+        </div>
       </div>
-    </n-card>
 
-    <!-- 图片预览遮罩 -->
-    <div v-if="showPreview" class="preview-mask" @click.self="showPreview = false">
-      <div class="preview-close" @click="showPreview = false">×</div>
-      <img :src="previewImageUrl" class="preview-img" alt="预览" />
+      <!-- 侧栏 -->
+      <div class="zh-side">
+        <div class="zh-card">
+          <div class="zh-card-title">热门文章</div>
+          <div
+            v-for="(item, i) in hotList"
+            :key="item.id"
+            class="zh-hot-item"
+            @click="goDetail(item)"
+          >
+            <span class="zh-hot-index">{{ i + 1 }}</span>
+            <span class="zh-hot-title">{{ item.title }}</span>
+          </div>
+        </div>
+
+        <div class="zh-card">
+          <div class="zh-card-title">关于本站</div>
+          <p class="zh-about">
+            本前台页面与占月明后台管理系统联动，后台发布的文章会自动展示在此页面。
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { BarChart, LineChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import * as echarts from 'echarts/core'
-import { UniversalTransition } from 'echarts/features'
-import { CanvasRenderer } from 'echarts/renderers'
-import VChart from 'vue-echarts'
-import { getStockListApi } from "@/api/stock/basic/index.js";
-import { getOrderAnalysisApi, getOrderAnalysisDetailApi } from "@/api/stock/analysis/index.js";
-import { getStockSseFundsApi } from "@/api/stock/sse/index.js";
-import { getBehaviourListAllApi } from "@/api/stock/behaviour/index.js";
-import { getStockOptionListApi, getDictDataListByTypeApi } from "@/api/stock/option/index.js";
-import { getStockMarketRecordApi, getStockMarketSchemaListAllApi } from "@/api/stock/market/index.js";
-import { getStockCaseListApi } from "@/api/stock/case/index.js";
-import { ref, onMounted, computed, watch, nextTick } from "vue";
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { getArticleListApi } from '@/api/article'
 
+const router = useRouter()
+const message = window.$message
 
-const stockList = ref([])
-const selectedStock = ref('')
-const selectedDate = ref('')
-const dateOptions = ref([])
-const fundData = ref([])
-const orderAnalysisDetail = ref('')
-const behaviourLoading = ref(false)
-const behaviourTableData = ref([])
-const behaviourMaxRecordCount = ref(0)
-const showPreview = ref(false)
-const previewImageUrl = ref('')
-const opinionList = ref([])
-const opinionViewer = ref('')
-const opinionViewerList = ref([])
-const opinionType = ref('')
-const opinionTypeList = ref([])
+const articleList = ref([])
+const loading = ref(true)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const totalPages = ref(1)
 
-// 大盘分析日历
-const marketRecords = ref([])
-const marketSchemaList = ref([])
-const selectedSchemaId = ref(null)
-const selectedMarketDate = ref('')
-const calendarYear = ref(new Date().getFullYear())
-const calendarMonth = ref(new Date().getMonth() + 1)
-
-const schemaNameMap = computed(() => {
-  const map = {}
-  marketSchemaList.value.forEach((s) => {
-    map[s.id] = s.name
-  })
-  return map
-})
-
-const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-
-const yearOptions = computed(() => {
-  const currentYear = new Date().getFullYear()
-  const years = []
-  for (let y = currentYear - 5; y <= currentYear + 1; y++) {
-    years.push({ label: String(y), value: y })
-  }
-  return years
-})
-
-const monthOptions = computed(() => {
-  return Array.from({ length: 12 }, (_, i) => ({
-    label: String(i + 1),
-    value: i + 1
-  }))
-})
-
-// 按日期(createdTime)分组的记录集合
-const marketDateSet = computed(() => {
-  const set = new Set()
-  marketRecords.value.forEach((r) => {
-    const dateStr = (r.createdTime || '').split(' ')[0]
-    if (dateStr) set.add(dateStr)
-  })
-  return set
-})
-
-const selectedMarketRecords = computed(() => {
-  let list = marketRecords.value
-
-  if (selectedSchemaId.value) {
-    list = list.filter((r) => r.schemaId === selectedSchemaId.value)
-  }
-
-  if (selectedMarketDate.value) {
-    list = list.filter((r) => {
-      const dateStr = (r.createdTime || '').split(' ')[0]
-      return dateStr === selectedMarketDate.value
-    })
-  }
-
-  return list
-})
-
-const calendarDays = ref([])
-
-const buildCalendar = () => {
-  const y = calendarYear.value
-  const m = calendarMonth.value
-  const firstDay = new Date(y, m - 1, 1).getDay() // 0=Sun
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const daysInPrevMonth = new Date(y, m - 1, 0).getDate()
-
-  const days = []
-  // 上月末尾填充
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = daysInPrevMonth - i
-    const pm = m === 1 ? 12 : m - 1
-    const py = m === 1 ? y - 1 : y
-    days.push({
-      day: d,
-      dateStr: `${py}-${String(pm).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-      isOtherMonth: true
-    })
-  }
-  // 当月
-  for (let d = 1; d <= daysInMonth; d++) {
-    days.push({
-      day: d,
-      dateStr: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-      isOtherMonth: false
-    })
-  }
-  // 下月开头填充 (fill to 42 cells = 6 rows)
-  const remaining = 42 - days.length
-  for (let d = 1; d <= remaining; d++) {
-    const nm = m === 12 ? 1 : m + 1
-    const ny = m === 12 ? y + 1 : y
-    days.push({
-      day: d,
-      dateStr: `${ny}-${String(nm).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-      isOtherMonth: true
-    })
-  }
-  calendarDays.value = days
-}
-
-const selectMarketDate = (dateStr) => {
-  selectedMarketDate.value = dateStr
-}
-
-const fetchMarketData = async () => {
+const fetchData = async () => {
+  loading.value = true
   try {
-    const [recordRes, schemaRes] = await Promise.all([
-      getStockMarketRecordApi({ sort: 'createdTime desc' }),
-      getStockMarketSchemaListAllApi()
-    ])
-    marketRecords.value = recordRes?.data || []
-    marketSchemaList.value = schemaRes?.data || []
-  } catch (e) {
-    // ignore
-  }
-}
-
-const caseList = ref([])
-const caseDetail = ref(null)
-
-const fetchCaseData = async () => {
-  try {
-    const res = await getStockCaseListApi({ sort: 'caseDate desc' })
-    caseList.value = res?.data || []
-  } catch (e) {
-    // ignore
-  }
-}
-
-echarts.use([
-  TooltipComponent,
-  GridComponent,
-  LegendComponent,
-  BarChart,
-  LineChart,
-  CanvasRenderer,
-  UniversalTransition,
-])
-
-const chartOption1 = computed(() => {
-  // 按日期分组
-  const dateMap = new Map()
-  fundData.value.forEach(item => {
-    const date = item.statDate
-    if (!dateMap.has(date)) {
-      dateMap.set(date, [])
-    }
-    dateMap.get(date).push(item)
-  })
-
-  // 获取所有唯一日期并排序
-  const dates = Array.from(dateMap.keys()).sort()
-
-  // 获取所有唯一基金，存储完整信息
-  const fundMap = new Map()
-  fundData.value.forEach(item => {
-    const key = item.secCode
-    if (!fundMap.has(key)) {
-      fundMap.set(key, {
-        name: item.secName,
-        data: [],
-        rawData: [],
-        baseValue: null
-      })
-    }
-  })
-
-  // 为每个基金填充数据并记录初始值
-  dates.forEach((date, index) => {
-    const dayData = dateMap.get(date)
-    const dayDataMap = new Map(dayData.map(item => [item.secCode, item.totVol]))
-
-    fundMap.forEach((fund, key) => {
-      const value = dayDataMap.get(key)
-      const numValue = value !== undefined ? Number(value) : null
-
-      if (index === 0 && numValue !== null) {
-        fund.baseValue = numValue
-      }
-
-      fund.rawData.push(numValue)
-      fund.data.push(numValue)
+    const res = await getArticleListApi({
+      pageIndex: currentPage.value - 1,
+      pageSize: pageSize.value,
+      sort: 'createdTime desc',
     })
-  })
-
-  // 归一化数据（使曲线自适应显示趋势）
-  const normalizeData = (data) => {
-    const validData = data.filter(v => v !== null && v !== undefined)
-    if (validData.length === 0) return data
-    const min = Math.min(...validData)
-    const max = Math.max(...validData)
-    const range = max - min || 1
-    return data.map(v => v !== null && v !== undefined ? (v - min) / range : null)
+    articleList.value = res?.data?.content || []
+    totalPages.value = res?.data?.totalPages || 1
   }
-
-  // 计算相对于初始值的百分比变化
-  const calculatePercentChange = (data, baseValue) => {
-    if (baseValue === null || baseValue === undefined) return data.map(() => null)
-    return data.map(v => {
-      if (v === null || v === undefined) return null
-      return ((v - baseValue) / baseValue * 100)
-    })
+  catch (e) {
+    articleList.value = []
+    totalPages.value = 1
   }
-
-  // 构建series，使用归一化数据显示，同时存储原始数据用于tooltip
-  const seriesData = []
-  const fundInfoMap = new Map()
-
-  Array.from(fundMap.entries()).forEach(([code, fund]) => {
-    const normalizedData = normalizeData(fund.data)
-    const percentData = calculatePercentChange(fund.rawData, fund.baseValue)
-
-    fundInfoMap.set(fund.name, {
-      rawData: fund.rawData,
-      percentData: percentData,
-    })
-
-    seriesData.push({
-      name: fund.name,
-      type: 'line',
-      data: normalizedData,
-      smooth: true,
-      lineStyle: {
-        width: 2,
-      },
-      symbol: 'circle',
-      symbolSize: 4,
-    })
-  })
-
-  return {
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params) => {
-        const dateIndex = params[0].dataIndex
-        let result = `<div style="font-weight: bold; margin-bottom: 8px;">${params[0].axisValue}</div>`
-        params.forEach(param => {
-          const fundInfo = fundInfoMap.get(param.seriesName)
-          if (param.value !== null && fundInfo) {
-            const rawValue = fundInfo.rawData[dateIndex]
-            const percentValue = fundInfo.percentData[dateIndex]
-            const sign = percentValue >= 0 ? '+' : ''
-            result += `<div style="display: flex; align-items: center; margin: 4px 0;">
-              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${param.color}; margin-right: 8px;"></span>
-              <span>${param.seriesName}: </span>
-              <span style="margin-left: 4px;">${rawValue?.toLocaleString() || '-'}</span>
-              <span style="margin-left: 8px; color: ${percentValue >= 0 ? '#10b981' : '#ef4444'}">(${sign}${percentValue?.toFixed(2) || '-'}%)</span>
-            </div>`
-          }
-        })
-        return result
-      }
-    },
-    legend: {
-      data: Array.from(fundMap.values()).map(f => f.name),
-      bottom: 0,
-      type: 'scroll',
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      top: '10%',
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      axisLabel: {
-        rotate: 45,
-      },
-    },
-    yAxis: {
-      type: 'value',
-      min: 0,
-      max: 1.2,
-      axisLabel: {
-        formatter: '{value}',
-      },
-    },
-    series: seriesData,
-  }
-})
-
-const chartOption2 = {
-  tooltip: {
-    trigger: 'axis',
-  },
-  xAxis: {
-    type: 'category',
-    data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-  },
-  yAxis: {
-    type: 'value',
-  },
-  series: [
-    {
-      data: [150, 230, 224, 218, 135, 147],
-      type: 'line',
-    },
-  ],
-}
-
-const getImageList = (record) => {
-  const urls = []
-  if (record.stickFormList) {
-    record.stickFormList.forEach((stick) => {
-      if (stick.fileList) {
-        stick.fileList.forEach((url) => urls.push(url))
-      }
-    })
-  }
-  return urls
-}
-
-const previewImage = (url) => {
-  previewImageUrl.value = url
-  showPreview.value = true
-}
-
-const fetchBehaviourData = async () => {
-  behaviourLoading.value = true
-  try {
-    const res = await getBehaviourListAllApi({ sort: 'createdTime desc' })
-    const records = res?.data || []
-
-    // 按 stockCode 分组，每组内按 createdTime 降序排列
-    const stockMap = new Map()
-    records.forEach((item) => {
-      const code = item.stockCode
-      if (!code) return
-      if (!stockMap.has(code)) {
-        stockMap.set(code, [])
-      }
-      stockMap.get(code).push(item)
-    })
-
-    // 每组按时间降序
-    let maxCount = 0
-    stockMap.forEach((list) => {
-      list.sort((a, b) => (b.createdTime || '').localeCompare(a.createdTime || ''))
-      if (list.length > maxCount) maxCount = list.length
-    })
-
-    // 构建行数据
-    const rows = stockList.value.map((stock) => {
-      return {
-        stockName: stock.stockFullName,
-        stockCode: stock.stockCode,
-        records: stockMap.get(stock.stockCode) || [],
-      }
-    })
-
-    behaviourMaxRecordCount.value = maxCount
-    behaviourTableData.value = rows
-  } finally {
-    behaviourLoading.value = false
+  finally {
+    loading.value = false
   }
 }
 
-const fetchOpinionData = async () => {
-  try {
-    const [opinionRes, dictRes] = await Promise.all([
-      getStockOptionListApi({ sort: 'createdTime desc' }),
-      getDictDataListByTypeApi({ typeId: '27210aac-3474-42e8-8a94-198f282f7290' })
-    ])
-    opinionList.value = opinionRes?.data || []
-    opinionTypeList.value = dictRes?.data || []
+// 侧栏热门：按发布时间倒序取前 5
+const hotList = computed(() => [...articleList.value].slice(0, 5))
 
-    // 从数据中提取唯一 viewer 列表
-    const viewers = new Set()
-    opinionList.value.forEach((item) => {
-      if (item.viewer) viewers.add(item.viewer)
-    })
-    opinionViewerList.value = Array.from(viewers)
-    if (opinionViewerList.value.length > 0 && !opinionViewer.value) {
-      opinionViewer.value = opinionViewerList.value[0]
-    }
-    await nextTick()
-    bindOpinionImageClicks()
-  } catch (e) {
-    // ignore
-  }
+const authorInitial = item => (item.author || '占').slice(0, 1)
+
+const avatarColor = author => {
+  const colors = ['#0084FF', '#0088A8', '#6B7A99', '#8E6F47', '#5F8E3E', '#A8443A']
+  const name = author || '占'
+  let hash = 0
+  for (let i = 0; i < name.length; i++)
+    hash = (hash * 31 + name.charCodeAt(i)) % 997
+  return colors[hash % colors.length]
 }
 
-const opinionFilteredList = computed(() => {
-  let list = opinionList.value
-  if (opinionViewer.value) {
-    list = list.filter((item) => item.viewer === opinionViewer.value)
-  }
-  if (opinionType.value) {
-    list = list.filter((item) => item.type === opinionType.value)
-  }
-  return list
-})
-
-const bindOpinionImageClicks = () => {
-  document.querySelectorAll('.opinion-content img').forEach((img) => {
-    img.style.cursor = 'pointer'
-    img.style.maxWidth = '100%'
-    img.style.height = 'auto'
-    img.onclick = (e) => {
-      previewImageUrl.value = e.target.src
-      showPreview.value = true
-    }
-  })
+const formatTime = (t) => {
+  if (!t)
+    return ''
+  return String(t).replace('T', ' ').slice(0, 16)
 }
 
-watch(opinionViewer, async () => {
-  opinionType.value = ''
-  await nextTick()
-  bindOpinionImageClicks()
-})
+const stripHtml = (html = '') => String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
-watch(opinionFilteredList, async () => {
-  await nextTick()
-  bindOpinionImageClicks()
-}, { deep: true })
-
-const stockOptions = computed(() => {
-  return stockList.value.map(item => ({
-    label: item.stockFullName,
-    value: item.stockCode
-  }))
-})
-
-const fetchDateOptions = async (value) => {
-  selectedStock.value = value
-  if (!selectedStock.value) {
-    dateOptions.value = []
-    selectedDate.value = ''
-    orderAnalysisDetail.value = ''
-    return
-  }
-  const res = await getOrderAnalysisApi({ stockCode: selectedStock.value })
-  // 假设接口返回的日期数据在 res.data.content 中，格式为 [{ date: '2024-01-01' }, ...]
-  dateOptions.value = (res.data.content || []).map(item => ({
-    label: item.date,
-    value: item.date
-  }))
+const excerpt = (content = '') => {
+  const text = stripHtml(content)
+  return text.length > 110 ? `${text.slice(0, 110)}…` : text
 }
 
-const fetchOrderAnalysisDetail = async (value) => {
-  selectedDate.value = value
-  if (!selectedDate.value || !selectedStock.value) {
-    orderAnalysisDetail.value = ''
-    return
-  }
-  const res = await getOrderAnalysisDetailApi({
-    stockCode: selectedStock.value,
-    date: selectedDate.value
-  })
-  orderAnalysisDetail.value = res.data || '暂无分析数据'
+const goDetail = item => router.push(`/article/${item.id}`)
+
+// 互动仅为前端演示，不真正落库
+const like = (item) => {
+  item.voteCount = (item.voteCount ?? 0) + 1
+  message.success('已赞同')
+}
+const dislike = (item) => {
+  message.info('已反对')
+}
+const favorite = () => message.success('已收藏')
+const share = () => {
+  navigator.clipboard?.writeText(window.location.href).then(() => message.success('链接已复制'))
 }
 
-onMounted(async ()=>{
-  const [stockRes, fundRes] = await Promise.all([
-    getStockListApi(),
-    getStockSseFundsApi()
-  ])
-  stockList.value = stockRes.data.content || []
-  fundData.value = fundRes.data || []
-  fetchBehaviourData()
-  fetchOpinionData()
-  buildCalendar()
-  fetchMarketData()
-  fetchCaseData()
-})
+onMounted(fetchData)
 </script>
 
 <style scoped>
-/* 大盘分析 */
-.market-layout {
+.zh-home {
+  min-height: 100%;
+  background: #f6f6f6;
+  padding: 20px 16px 40px;
+}
+
+.zh-container {
+  max-width: 1000px;
+  margin: 0 auto;
   display: flex;
-  flex-direction: column;
   gap: 16px;
+  align-items: flex-start;
 }
-@media (min-width: 768px) {
-  .market-layout {
-    flex-direction: row;
-    gap: 24px;
-  }
-  .market-calendar {
-    flex: 0 0 380px;
-  }
+
+.zh-main {
+  flex: 1;
+  min-width: 0;
 }
-.calendar-nav {
+
+/* 顶部 tab */
+.zh-tabbar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 24px;
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 2px;
+  padding: 0 20px;
+  height: 50px;
   margin-bottom: 12px;
 }
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 4px;
-}
-.weekday-cell {
-  padding: 4px 0;
-}
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-.calendar-day {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  border-radius: 4px;
+
+.zh-tab {
+  font-size: 15px;
+  color: #444;
   cursor: pointer;
-  transition: all 0.15s;
-  border: 1px solid transparent;
-}
-.calendar-day:hover {
-  background: #f0f0f0;
-}
-.calendar-day.has-data {
-  background: #fde68a;
-  border-color: #f59e0b;
-  font-weight: 600;
-}
-.calendar-day.has-data:hover {
-  background: #fcd34d;
-}
-.calendar-day.is-selected {
-  background: #409eff;
-  color: #fff;
-  border-color: #409eff;
-}
-.calendar-day.is-other-month {
-  color: #ccc;
-}
-.market-filter-bar {
-  margin-bottom: 16px;
+  height: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-.market-analysis {
-  flex: 1;
-  min-height: 200px;
-  max-height: 300px;
-  overflow-y: auto;
-  border-top: 1px solid #ebeef5;
-  padding-top: 16px;
-}
-@media (min-width: 768px) {
-  .market-analysis {
-    min-height: 400px;
-    max-height: 460px;
-    border-left: 1px solid #ebeef5;
-    border-top: none;
-    padding-left: 24px;
-    padding-top: 0;
-  }
-}
-.schema-tag {
-  font-size: 12px;
-  color: #909399;
-  font-weight: 400;
-  margin-left: 4px;
-}
-.analysis-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.analysis-item {
-  padding: 12px 16px;
-  background: #f9fafb;
-  border-radius: 8px;
-}
-.analysis-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.analysis-item-header h4 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-@media (min-width: 768px) {
-  .analysis-item-header h4 {
-    font-size: 15px;
-  }
-}
-.analysis-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.analysis-field {
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
-  flex-wrap: wrap;
-}
-@media (min-width: 768px) {
-  .analysis-fields {
-    gap: 6px;
-  }
-  .analysis-field {
-    gap: 8px;
-    font-size: 13px;
-    flex-wrap: nowrap;
-  }
-}
-.field-label {
-  color: #666;
-  min-width: 60px;
-  flex-shrink: 0;
-}
-@media (min-width: 768px) {
-  .field-label {
-    min-width: 80px;
-  }
-}
-.field-value {
-  font-weight: 500;
-  color: #333;
+  border-bottom: 3px solid transparent;
 }
 
-.behaviour-cell {
-  line-height: 1.5;
+.zh-tab--active {
+  color: #0084ff;
+  border-bottom-color: #0084ff;
+  font-weight: 600;
 }
-.behaviour-date {
-  font-size: 11px;
-  color: #409eff;
-  font-weight: 500;
-  margin-bottom: 4px;
+
+/* 文章卡片 */
+.zh-feed {
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 2px;
 }
-.behaviour-analysis {
-  font-size: 11px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.behaviour-plan {
-  font-size: 10px;
-  color: #909399;
-  margin-top: 3px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-@media (min-width: 768px) {
-  .behaviour-date {
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
-  .behaviour-analysis {
-    font-size: 13px;
-  }
-  .behaviour-plan {
-    font-size: 12px;
-    margin-top: 4px;
-  }
-}
-.behaviour-images {
+
+.zh-feed-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f2f5;
+  transition: background 0.2s;
 }
-.behaviour-image {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border-radius: 4px;
-  border: 1px solid #ebeef5;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.behaviour-image:hover {
-  opacity: 0.8;
-}
-.preview-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.85);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-.preview-img {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-  border-radius: 4px;
-}
-.preview-close {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 40px;
-  color: white;
-  cursor: pointer;
-  user-select: none;
-  z-index: 10000;
-  transition: 0.2s;
-}
-.preview-close:hover {
-  color: #ff4444;
-}
-/* 股票案例 */
-.case-list {
-  max-height: 360px;
-  overflow-y: auto;
-}
-.case-item {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.case-item:last-child {
+
+.zh-feed-item:last-child {
   border-bottom: none;
 }
-.case-item:hover {
-  background: #f5f7fa;
-}
-.case-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 4px;
-}
-.case-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: #999;
-}
-.case-detail {
-  max-height: 460px;
-  overflow-y: auto;
-}
-.case-detail-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.case-detail-meta {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #ebeef5;
-}
-.case-detail-content {
-  font-size: 14px;
-  line-height: 1.8;
-  word-break: break-word;
-}
-.case-detail-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 8px 0;
+
+.zh-feed-item:hover {
+  background: #fafbfc;
 }
 
-.opinion-timeline {
-  height: 200px;
-  overflow-y: auto;
+/* 投票区 */
+.zh-vote {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
-.opinion-item-header {
-  margin-bottom: 4px;
+
+.zh-vote-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ebebeb;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8590a6;
+  background: #fff;
+  transition: all 0.2s;
 }
-.opinion-stock {
-  font-size: 13px;
+
+.zh-vote-btn:hover {
+  border-color: #0084ff;
+  color: #0084ff;
+}
+
+.zh-vote-arrow {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 6px solid currentColor;
+}
+
+.zh-vote-arrow--down {
+  border-bottom: none;
+  border-top: 6px solid currentColor;
+}
+
+.zh-vote-count {
+  font-size: 15px;
+  color: #444;
   font-weight: 600;
 }
-.opinion-content {
-  font-size: 12px;
-  line-height: 1.6;
-  word-break: break-word;
+
+/* 正文区 */
+.zh-body {
+  flex: 1;
+  min-width: 0;
+  margin-left: 14px;
 }
-@media (min-width: 768px) {
-  .opinion-timeline {
-    height: 300px;
-  }
-  .opinion-item-header {
-    margin-bottom: 6px;
-  }
-  .opinion-stock {
-    font-size: 14px;
-  }
-  .opinion-content {
-    font-size: 13px;
-    line-height: 1.7;
-  }
+
+.zh-author {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
 }
-.opinion-content :deep(img) {
-  max-width: 100%;
-  max-height: 300px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  display: block;
-  margin: 8px 0;
+
+.zh-avatar {
+  width: 28px;
+  height: 28px;
   border-radius: 4px;
-  transition: transform 0.2s;
-  margin: 3px auto;
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  flex-shrink: 0;
 }
-.opinion-content :deep(img):hover {
-  transform: scale(1.02);
+
+.zh-author-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zh-author-name {
+  font-size: 14px;
+  color: #175199;
+  font-weight: 600;
+}
+
+.zh-author-time {
+  font-size: 13px;
+  color: #8590a6;
+}
+
+.zh-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #121212;
+  line-height: 1.4;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.zh-title:hover {
+  color: #0084ff;
+}
+
+.zh-excerpt {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.7;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.zh-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 12px;
+}
+
+.zh-action {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #646464;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.zh-action:hover {
+  color: #0084ff;
+}
+
+.zh-action-icon {
+  font-size: 12px;
+}
+
+/* 分页 */
+.zh-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* 侧栏 */
+.zh-side {
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+}
+
+.zh-card {
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 2px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.zh-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #121212;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.zh-hot-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.zh-hot-item:hover .zh-hot-title {
+  color: #0084ff;
+}
+
+.zh-hot-index {
+  width: 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0084ff;
+  flex-shrink: 0;
+}
+
+.zh-hot-item:nth-child(n + 4) .zh-hot-index {
+  color: #8590a6;
+}
+
+.zh-hot-title {
+  font-size: 14px;
+  color: #1a1a1a;
+  line-height: 1.5;
+  transition: color 0.2s;
+}
+
+.zh-about {
+  font-size: 13px;
+  color: #646464;
+  line-height: 1.8;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .zh-side {
+    display: none;
+  }
 }
 </style>
